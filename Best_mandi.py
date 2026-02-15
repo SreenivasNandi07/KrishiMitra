@@ -49,6 +49,7 @@ def get_best_mandi(df, crop):
 import pandas as pd
 
 def get_best_mandi(df, crop):
+    
     df = df.copy()
     df.columns = df.columns.str.lower()
 

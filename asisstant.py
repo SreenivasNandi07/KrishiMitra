@@ -103,7 +103,7 @@ from Crop_prices_predict import PricePredictor
 from Best_mandi import get_best_mandi
 from demand_predict import predict_demand_trend
 from storage_advisor import storage_advisor
-
+'''
 SUPPORTED_CROPS = {
     "wheat": "Wheat",
     "onion": "Onion",
@@ -111,7 +111,25 @@ SUPPORTED_CROPS = {
     "maize": "Maize",
     "groundnut": "Groundnut",
     "cotton": "Cotton"
+}'''
+
+SUPPORTED_CROPS = {
+    "wheat": "Wheat",
+    "rice": "Rice",
+    "maize": "Maize",
+    "bajra": "Bajra (Pearl Millet/Cumbu)",
+    "jowar": "Jowar (Sorghum)",
+    "ragi": "Ragi (Finger Millet)",
+    "onion": "Onion",
+    "potato": "Potato",
+    "tomato": "Tomato",
+    "cotton": "Cotton",
+    "groundnut": "Groundnut",
+    "soybean": "Soyabean",
+    "banana": "Banana",
+    "mango": "Mango"
 }
+
 
 class FarmerAssistant:
     def __init__(self, mongo, kb):
@@ -134,7 +152,8 @@ class FarmerAssistant:
                 return value
         return None
 
-    def ask(self, user_query: str):
+    def ask(self, user_query: str, language: str = "English"):
+
         if self.df.empty:
             return "I cannot access crop data right now."
 
@@ -176,7 +195,7 @@ class FarmerAssistant:
         )
 
         # 6️⃣ LLM explanation
-        prompt = f"""
+        '''prompt = f"""
 Farmer Query: {user_query}
 
 Crop: {crop}
@@ -187,8 +206,19 @@ Predicted Price (7 days): ₹{predicted_price:.2f}
 Storage Advice: {advice}
 
 Explain clearly and practically.
-"""
+"""''' 
+        prompt = f"""
+Farmer Query: {user_query}
 
+Crop: {crop}
+Best Market: {mandi_data['market']} ({mandi_data['district']}, {mandi_data['state']})
+Current Price: ₹{current_price}
+Demand Trend: {trend}
+Predicted Price (7 days): ₹{predicted_price:.2f}
+Storage Advice: {advice}
+
+Explain clearly and practically in {language}.
+"""
         response = ollama.chat(
             model=self.model,
             messages=[{"role": "user", "content": prompt}]
