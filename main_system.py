@@ -3,7 +3,7 @@ from vectorstore import KnowledgeBase
 from asisstant import create_farmer_agent
 
 # 1. Initialize DBs
-mongo = MongoHandler("your_mongodb_atlas_connection_string")
+mongo = MongoHandler("mongodb+srv://farmer_admin:Roronoa123@newmain.t1vt5ne.mongodb.net/?appName=NewMain")
 kb = KnowledgeBase()
 
 # 2. Add some initial farming knowledge (One-time setup)
@@ -22,6 +22,7 @@ assistant = create_farmer_agent(mongo, kb)
 
 # --- Test Query ---
 query = "Should I sell my Maize today or wait? Also, how do I treat leaf spots?"
-response = assistant.run(query)
+response = response = assistant.ask(query)
+
 
 print("\n\nAI ASSISTANT RESPONSE:\n", response)

@@ -39,9 +39,12 @@ def predict_demand_trend(df, commodity_name):
     Predicts if the market pressure (proxy for demand) will increase or decrease.
     """
     # Filter and Aggregate to get one price point per day
-    crop_df = df[df['Commodity'] == commodity_name].copy()
-    crop_df['Arrival_Date'] = pd.to_datetime(crop_df['Arrival_Date'])
-    
+    #crop_df = df[df['Commodity'] == commodity_name].copy()
+    crop_df = df[df['commodity'] == commodity_name.lower()].copy()
+
+    #crop_df['Arrival_Date'] = pd.to_datetime(crop_df['Arrival_Date'])
+    crop_df['arrival_date'] = pd.to_datetime(crop_df['arrival_date'])
+
     # We group by date to get a single trend line for the whole region
     daily_df = crop_df.groupby('Arrival_Date')['Modal_Price'].mean().reset_index()
     

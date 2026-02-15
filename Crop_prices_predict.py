@@ -1,3 +1,69 @@
+# works well
+import torch
+import torch.nn as nn
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import MinMaxScaler
+
+class PriceLSTM(nn.Module):
+    def __init__(self, input_size):
+        super().__init__()
+        self.lstm = nn.LSTM(input_size, 64, 2, batch_first=True, dropout=0.2)
+        self.fc = nn.Linear(64, 7)
+
+    def forward(self, x):
+        out, _ = self.lstm(x)
+        return self.fc(out[:, -1, :])
+
+class PricePredictor:
+    def __init__(self):
+        self.scaler = MinMaxScaler()
+
+    def prepare_data(self, df, crop):
+        data = df[df["Commodity"] == crop].copy()
+        if len(data) < 100:
+            raise ValueError("Not enough data for prediction")
+
+        data["Arrival_Date"] = pd.to_datetime(data["Arrival_Date"])
+        data = data.sort_values("Arrival_Date").set_index("Arrival_Date")
+
+        data = data["Modal_Price"].resample("D").mean().interpolate()
+        data = data.to_frame()
+
+        data["MA7"] = data["Modal_Price"].rolling(7).mean()
+        data["MA30"] = data["Modal_Price"].rolling(30).mean()
+        data.dropna(inplace=True)
+
+        return self.scaler.fit_transform(data)
+
+    def create_sequences(self, data, seq_len=60):
+        X, y = [], []
+        for i in range(len(data) - seq_len - 7):
+            X.append(data[i:i+seq_len])
+            y.append(data[i+seq_len:i+seq_len+7, 0])
+        return torch.tensor(X, dtype=torch.float32), torch.tensor(y, dtype=torch.float32)
+
+    def predict(self, df, crop):
+        data = self.prepare_data(df, crop)
+        X, y = self.create_sequences(data)
+
+        model = PriceLSTM(X.shape[2])
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+        loss_fn = nn.MSELoss()
+
+        for _ in range(25):
+            optimizer.zero_grad()
+            loss = loss_fn(model(X), y)
+            loss.backward()
+            optimizer.step()
+
+        model.eval()
+        with torch.no_grad():
+            pred = model(X[-1:].clone()).numpy()[0]
+
+        min_, max_ = self.scaler.data_min_[0], self.scaler.data_max_[0]
+        return (pred * (max_ - min_) + min_).tolist()
+"""
 import torch
 import torch.nn as nn
 import numpy as np
@@ -6,56 +72,57 @@ from sklearn.preprocessing import MinMaxScaler
 
 class PriceLSTM(nn.Module):
     def __init__(self, input_size=3, hidden_size=64, num_layers=2, output_size=7):
-        super(PriceLSTM, self).__init__()
+        super().__init__()
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout=0.2)
         self.fc = nn.Linear(hidden_size, output_size)
 
     def forward(self, x):
-        # x shape: (batch, seq_len, input_size)
         out, _ = self.lstm(x)
-        out = self.fc(out[:, -1, :]) # Take the last time step
-        return out
+        return self.fc(out[:, -1, :])
 
 class PricePredictor:
     def __init__(self):
         self.model = None
         self.scaler = MinMaxScaler()
-        
-    def prepare_data(self, df, commodity_name):
-        # Filter for specific crop and sort by date
-        data = df[df['Commodity'] == commodity_name].copy()
-        data['Arrival_Date'] = pd.to_datetime(data['Arrival_Date'])
-        data = data.sort_values('Arrival_Date').set_index('Arrival_Date')
-        
-        # Resample to daily to handle missing dates (interpolate)
-        data = data['Modal_Price'].resample('D').mean().interpolate(method='linear').to_frame()
-        
-        # Feature Engineering: 7-day and 30-day Moving Averages
-        data['MA7'] = data['Modal_Price'].rolling(window=7).mean()
-        data['MA30'] = data['Modal_Price'].rolling(window=30).mean()
-        data.dropna(inplace=True)
-        
-        scaled_data = self.scaler.fit_transform(data)
-        return scaled_data
 
-    def create_sequences(self, data, seq_length=60, pred_length=7):
-        x, y = [], []
-        for i in range(len(data) - seq_length - pred_length):
-            x.append(data[i : i + seq_length])
-            y.append(data[i + seq_length : i + seq_length + pred_length, 0]) # Predict Modal_Price
-        return torch.tensor(np.array(x), dtype=torch.float32), torch.tensor(np.array(y), dtype=torch.float32)
+    def prepare_data(self, df, crop):
+        # 🔑 normalize columns ONCE
+        df = df.copy()
+        df.columns = df.columns.str.lower()
 
-    def train_model(self, x_train, y_train, epochs=50):
-        self.model = PriceLSTM(input_size=x_train.shape[2])
-        criterion = nn.MSELoss()
-        optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
-        
-        for epoch in range(epochs):
-            self.model.train()
-            optimizer.zero_grad()
-            outputs = self.model(x_train)
-            loss = criterion(outputs, y_train)
+        data = df[df["commodity"] == crop].copy()
+        if data.empty:
+            raise ValueError(f"No data found for crop: {crop}")
+
+        data["arrival_date"] = pd.to_datetime(data["arrival_date"])
+        data = data.sort_values("arrival_date").set_index("arrival_date")
+
+        data = data["modal_price"].resample("D").mean().interpolate()
+
+        data = pd.DataFrame({
+            "price": data,
+            "ma7": data.rolling(7).mean(),
+            "ma30": data.rolling(30).mean()
+        }).dropna()
+
+        scaled = self.scaler.fit_transform(data)
+        return scaled
+
+    def create_sequences(self, data, seq_len=60, pred_len=7):
+        X, y = [], []
+        for i in range(len(data) - seq_len - pred_len):
+            X.append(data[i:i+seq_len])
+            y.append(data[i+seq_len:i+seq_len+pred_len, 0])
+        return torch.tensor(np.array(X), dtype=torch.float32), torch.tensor(np.array(y), dtype=torch.float32)
+
+    def train_model(self, X, y, epochs=10):
+        self.model = PriceLSTM(input_size=X.shape[2])
+        opt = torch.optim.Adam(self.model.parameters(), lr=0.001)
+        loss_fn = nn.MSELoss()
+
+        for _ in range(epochs):
+            opt.zero_grad()
+            loss = loss_fn(self.model(X), y)
             loss.backward()
-            optimizer.step()
-            if (epoch+1) % 10 == 0:
-                print(f'Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.4f}')
+            opt.step()
+"""
