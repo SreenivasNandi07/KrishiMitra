@@ -3,7 +3,14 @@ from vectorstore import KnowledgeBase
 from asisstant import create_farmer_agent
 
 # 1. Initialize DBs
-mongo = MongoHandler("mongodb+srv://farmer_admin:Roronoa123@newmain.t1vt5ne.mongodb.net/?appName=NewMain")
+import os
+
+MONGO_URI = os.getenv("MONGO_URI")  # <- gets it from environment variable
+if not MONGO_URI:
+    raise ValueError("MONGO_URI environment variable not set")
+
+mongo = MongoHandler(MONGO_URI)
+#mongo = MongoHandler("mongodb+srv://farmer_admin:Roronoa123@newmain.t1vt5ne.mongodb.net/?appName=NewMain")
 kb = KnowledgeBase()
 
 # 2. Add some initial farming knowledge (One-time setup)
