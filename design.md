@@ -2,27 +2,7 @@
 
 ## 1. System Architecture
 
-   +--------------------+          +------------------+
-   |   Streamlit UI     | <------> |    FastAPI API    |
-   | (Farmer Dashboard) |          |  (Backend Logic)  |
-   +--------------------+          +--------+---------+
-                                            |
-                                            v
-                                   +----------------+
-                                   | MongoDB Atlas  |
-                                   | crop_insights  |
-                                   +----------------+
-                                            |
-                                            v
-                                   +----------------+
-                                   | Knowledge Base |
-                                   |   (FAISS)      |
-                                   +----------------+
-                                            |
-                                            v
-                                  +------------------+
-                                  | Ollama LLM Model |
-                                  +------------------+
+
 
 
 - **Frontend (Streamlit UI):** Dashboard with tabs for AI queries, price predictor, best mandi, demand trend, and storage advisor.
